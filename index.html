@@ -544,6 +544,20 @@
             box-shadow: 0 12px 35px rgba(255, 158, 181, 0.4);
         }
 
+        /* Disabled states */
+        button:disabled,
+        button.disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            filter: grayscale(0.05);
+        }
+
+        .next-btn.disabled {
+            pointer-events: none;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
         /* Page 3 - Game */
         .game-container {
             padding: 10px 0;
@@ -1358,11 +1372,15 @@
 
         /* Mobile optimizations */
         #page2 {
-            display: flex;
+            display: none;
             flex-direction: column;
             height: 100vh;
             max-height: 100vh;
             overflow: hidden;
+        }
+
+        #page2.active {
+            display: flex;
         }
 
         #page2 .chat-container {
@@ -1408,7 +1426,7 @@
         <div class="page active" id="page1">
             <div class="question-container">
                 <div class="subtitle">A Message For You</div>
-                <h1>Dearest Mili ❤️</h1>
+                <h1>Sweetheart ❤️</h1>
 
                 <div class="text-center mb-2">
                     <p>A special moment crafted just for you, my love</p>
@@ -1467,7 +1485,7 @@
             </div>
 
             <div style="padding: 20px; background: white; flex-shrink: 0;">
-                <button class="next-btn" id="toGameBtn">
+                <button class="next-btn disabled" id="toGameBtn" disabled>
                     Let's Play Together
                     <i class="fas fa-chevron-right"></i>
                 </button>
@@ -1570,7 +1588,23 @@
         const pages = document.querySelectorAll('.page');
         let currentPage = 1;
 
+        // Progress gates
+        let hasAcceptedLove = false;
+        let chatCompleted = false;
+        let gameCompleted = false;
+
         function showPage(pageNumber) {
+            const accessRules = {
+                1: () => true,
+                2: () => hasAcceptedLove,
+                3: () => chatCompleted,
+                4: () => gameCompleted
+            };
+
+            if (accessRules[pageNumber] && !accessRules[pageNumber]()) {
+                return; // Block navigation if previous step not complete
+            }
+
             pages.forEach(page => page.classList.remove('active'));
 
             document.getElementById(`page${pageNumber}`).classList.add('active');
@@ -1586,6 +1620,7 @@
             document.getElementById('answerText').classList.remove('hidden');
             this.innerHTML = `<span class="heart-pulse">❤️</span> I Love You Too, Arya <span class="heart-pulse">❤️</span>`;
             this.style.pointerEvents = 'none';
+            hasAcceptedLove = true;
 
             setTimeout(() => showPage(2), 1500);
         });
@@ -1602,7 +1637,7 @@
 
                 // Arya's reply after a short delay (from left side - received)
                 setTimeout(() => {
-                    const aryaMessage = 'I know these days can be tough, babe, with cramps making you uncomfortable and mood swings making everything feel heavier. I want you to know that I see you, I understand, and I\'m here for you in every way possible. No matter how you\'re feeling today - whether you\'re tired, irritable, emotional, or just not yourself - I\'m not going anywhere. I\'ll be right here by your side, bringing you warm tea, comforting hugs, and all the love you need. Please don\'t stress about anything. Let me take care of you. Let me be your safe space where you can just be exactly how you feel. You don\'t have to be strong all the time - I\'ve got you. Remember that you\'re beautiful, you\'re strong, and you\'re loved more than words can express. This phase will pass, but my love for you is constant and unchanging. Just relax, my love. Let me pamper you and make you feel special, because you truly are. With all my love, today and always, ❤️';
+                    const aryaMessage = 'I know these days can be tough, babe, with cramps making you uncomfortable and mood swings making everything feel heavier. I want you to know that I see you, I understand, and I\'m here for you in every way possible. No matter how you\'re feeling today - whether you\'re tired, irritable, emotional, or just not yourself - I\'m not going anywhere. I\'ll be right here by your side, Please don\'t stress about anything. Let me take care of you. Let me be your safe space where you can just be exactly how you feel. You don\'t have to be strong all the time - I\'ve got you. Remember that you\'re beautiful, you\'re strong, and you\'re loved more than words can express. This phase will pass, but my love for you is constant and unchanging. Just relax, my love. Let me pamper you and make you feel special, because you truly are. With all my love, today and always, ❤️';
                     addMessageToChat('Arya', aryaMessage, 'received', '9:43 AM');
                     chatContainer.scrollTop = chatContainer.scrollHeight;
                 }, 2000);
@@ -1623,8 +1658,16 @@
                 if (e.key === 'Enter') sendMessage();
             });
 
-            // To Game button
-            document.getElementById('toGameBtn').addEventListener('click', () => showPage(3));
+            // To Game button (enabled only after chat completion)
+            const toGameBtn = document.getElementById('toGameBtn');
+            setNextButtonState(toGameBtn, chatCompleted);
+            if (!toGameBtn.dataset.bound) {
+                toGameBtn.addEventListener('click', () => {
+                    if (!chatCompleted) return;
+                    showPage(3);
+                });
+                toGameBtn.dataset.bound = 'true';
+            }
         }
 
         function addMessageToChat(sender, content, type, time) {
@@ -1644,6 +1687,7 @@
         function sendPresetMessage(message) {
             // pupu sends message (right side - sent)
             addMessageToChat('pupu', message, 'sent', getCurrentTime());
+            markChatCompleted();
 
             // Auto-reply from Arya based on the preset message
             setTimeout(() => {
@@ -1673,6 +1717,7 @@
                 // pupu sends message (right side - sent)
                 addMessageToChat('pupu', message, 'sent', getCurrentTime());
                 input.value = '';
+                markChatCompleted();
 
                 // Auto-reply from Arya
                 setTimeout(() => {
@@ -1717,6 +1762,7 @@
             gameBoard = ['', '', '', '', '', '', '', '', ''];
             currentPlayer = '❤️';
             gameActive = true;
+            gameCompleted = false;
 
             const gameBoardElement = document.getElementById('gameBoard');
             const gameStatusElement = document.getElementById('gameStatus');
@@ -1740,7 +1786,10 @@
             document.getElementById('restartBtn').addEventListener('click', initializeGame);
 
             // Proceed button
-            proceedBtn.addEventListener('click', () => showPage(4));
+            if (!proceedBtn.dataset.bound) {
+                proceedBtn.addEventListener('click', () => showPage(4));
+                proceedBtn.dataset.bound = 'true';
+            }
         }
 
         function handleCellClick(event) {
@@ -1833,6 +1882,7 @@
                         gameStatusElement.innerHTML = "I won! 💙 But you're still the champion of my heart!";
                         gameStatusElement.style.color = 'var(--secondary-dark)';
                     }
+                    gameCompleted = true;
                     proceedBtn.style.display = 'flex';
                     return;
                 }
@@ -1843,6 +1893,7 @@
                 gameActive = false;
                 gameStatusElement.innerHTML = "It's a perfect draw! ❤️💙";
                 gameStatusElement.style.color = 'var(--primary-dark)';
+                gameCompleted = true;
                 proceedBtn.style.display = 'flex';
                 return;
             }
@@ -1865,40 +1916,40 @@
 
         const songs = [
             {
-                title: "Perfect",
-                artist: "Ed Sheeran",
-                album: "A song that reminds me of you",
-                src: "https://assets.codepen.io/1468070/Ed+Sheeran+-+Perfect+(Official+Music+Video).mp3"
+                title: "Tum Se Hi",
+                artist: "Mohit Chauhan, Pritam Chakraborty, Irshad Kamil",
+                album: "Jab We Met",
+                src: "https://res.cloudinary.com/arya1/video/upload/v1765264418/TumSeHi.mp3"
             },
             {
-                title: "A Thousand Years",
-                artist: "Christina Perri",
-                album: "For all our moments together",
-                src: "https://assets.codepen.io/1468070/Christina+Perri+-+A+Thousand+Years+Lyrics.mp3"
+                title: "Sajdaa",
+                artist: "Shankar Mahadevan, Richa Sharma, Rahat Fateh Ali Khan",
+                album: "My Name Is Khan",
+                src: "https://res.cloudinary.com/arya1/video/upload/v1765263128/Sajdaa.mp3"
             },
             {
-                title: "All of Me",
-                artist: "John Legend",
-                album: "Every part of you is beautiful",
-                src: "https://assets.codepen.io/1468070/John+Legend+-+All+Of+Me+(Official+Video).mp3"
+                title: "Tum Ho Toh",
+                artist: "Hansika Pareek, Vishal Mishra, Raj Shekhar",
+                album: "SAIYAARA",
+                src: "https://res.cloudinary.com/arya1/video/upload/v1765263868/Tum%20Ho%20Toh.mp3"
             },
             {
-                title: "Make You Feel My Love",
-                artist: "Adele",
-                album: "My love for you, always",
-                src: "https://assets.codepen.io/1468070/Adele+-+Make+You+Feel+My+Love+(Official+Lyric+Video).mp3"
+                title: "Gehra Hua",
+                artist: "Arijit Singh, Shashwat Sachdev, Irshad Kamil, Armaan Khan",
+                album: "Dhurandhar",
+                src: "https://res.cloudinary.com/arya1/video/upload/v1765264023/Gehra%20Hua.mp3"
             },
             {
-                title: "I Will Always Love You",
-                artist: "Whitney Houston",
-                album: "A promise from my heart",
-                src: "https://assets.codepen.io/1468070/Whitney+Houston+-+I+Will+Always+Love+You+(Official+4K+Video).mp3"
+                title: "Chori Kiya Re Jiya",
+                artist: "Sonu Nigam, Shreya Ghoshal",
+                album: "Dabangg",
+                src: "https://res.cloudinary.com/arya1/video/upload/v1765264212/ChoriKiyaReJiya.mp3"
             },
             {
-                title: "Thinking Out Loud",
-                artist: "Ed Sheeran",
-                album: "Growing old with you in mind",
-                src: "https://assets.codepen.io/1468070/Ed+Sheeran+-+Thinking+Out+Loud+(Official+Video).mp3"
+                title: "O My Love",
+                artist: "Kunal Ganjawala, Shreya Ghoshal, Jeet Ganguly",
+                album: "Amanush",
+                src: "https://res.cloudinary.com/arya1/video/upload/v1765263470/O%20My%20Love.mp3"
             }
         ];
 
@@ -2035,6 +2086,20 @@
                 audioPlayer.currentTime = seekTime;
             }
         });
+
+        // Helpers for progression
+        function markChatCompleted() {
+            if (chatCompleted) return;
+            chatCompleted = true;
+            const toGameBtn = document.getElementById('toGameBtn');
+            setNextButtonState(toGameBtn, true);
+        }
+
+        function setNextButtonState(button, enabled) {
+            if (!button) return;
+            button.disabled = !enabled;
+            button.classList.toggle('disabled', !enabled);
+        }
 
         // Initialize first page
         showPage(1);
